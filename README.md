@@ -26,7 +26,7 @@ Designed for both human users and AI agents. Default output is JSON for machine 
 
 ```bash
 # Clone the repository
-git clone https://github.com/richi/loilonote-cli.git
+git clone https://github.com/kunetinun/loilonote-cli.git
 cd loilonote-cli
 
 # Install dependencies
