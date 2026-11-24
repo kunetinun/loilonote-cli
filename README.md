@@ -1,152 +1,152 @@
 # LoiLoNote CLI
 
-A command-line tool to automate [LoiLoNote School](https://loilonote.app) web UI via Playwright.
+[LoiLoNote School](https://loilonote.app) の Web UI を Playwright で自動操作するコマンドラインツールです。
 
-Designed for both human users and AI agents. Default output is JSON for machine readability.
+人間ユーザーと AI エージェントの両方を想定しています。デフォルトの出力は機械可読な JSON です。
 
-## Features
+## 特徴
 
-- 🔐 **Session management** — Login once, reuse session
-- 📚 **Course discovery** — List all courses with URLs
-- 📝 **Note management** — List and read notes
-- 📁 **Materials search** — Recursively search materials box by name
-- 📤 **Submissions** — List submission boxes and upload files
-- 📨 **Messaging** — Send files to individuals
-- 🤖 **AI-first** — JSON output by default, `--human` for readable output
-- 🔄 **Caching** — Course URLs cached for fast reuse
+- 🔐 **セッション管理** — 一度ログインすれば再利用可能
+- 📚 **コース発見** — すべてのコースと URL を一覧表示
+- 📝 **ノート管理** — ノートの一覧表示と内容取得
+- 📁 **資料検索** — 資料箱を名前で再帰検索
+- 📤 **提出** — 提出箱の一覧表示とファイルアップロード
+- 📨 **メッセージング** — 個人へのファイル送信
+- 🤖 **AI ファースト** — デフォルトは JSON 出力、`--human` で読みやすい出力
+- 🔄 **キャッシュ** — コース URL をキャッシュして高速再利用
 
-## Installation
+## インストール
 
-### Prerequisites
+### 前提条件
 
 - Python 3.9+
 - Playwright + Chromium
 
-### Install
+### インストール手順
 
 ```bash
-# Clone the repository
+# リポジトリをクローン
 git clone https://github.com/kunetinun/loilonote-cli.git
 cd loilonote-cli
 
-# Install dependencies
+# 依存関係をインストール
 pip install -e .
 
-# Install Playwright browser
+# Playwright のブラウザをインストール
 playwright install chromium
 ```
 
-### Windows note
+### Windows での注意点
 
-Playwright uses named pipes, which may be blocked in sandboxed environments.
-Run with full access if needed.
+Playwright は名前付きパイプを使用するため、サンドボックス環境ではブロックされる場合があります。
+必要に応じてフルアクセス権で実行してください。
 
-## Usage
+## 使い方
 
-### First-time setup
+### 初回セットアップ
 
 ```bash
-# Login (opens browser for manual login)
+# ログイン（ブラウザが開くので手動でログイン）
 loilonote login
 
-# Verify session
+# セッション確認
 loilonote status
 ```
 
-### Commands
+### コマンド一覧
 
 ```bash
-# Check environment
+# 環境チェック
 loilonote doctor
 
-# List courses (cached after first run)
+# コース一覧（初回以降はキャッシュ）
 loilonote courses
 loilonote courses --refresh
 
-# Search materials (fast, uses UI search)
+# 資料検索（UI 検索を使用、高速）
 loilonote materials-search "古文単語"
 
-# Search and open first match
+# 検索して最初の一致を開く
 loilonote materials-search "古文単語" --open
 
-# Get material content
+# 資料の内容を取得
 loilonote materials-get "古典文法　２学期小テスト計画"
 
-# List materials in a folder
+# フォルダ内の資料一覧
 loilonote materials --path "学内共有/81期　国語科/１年次"
 
-# Recursively list materials tree
+# 資料ツリーを再帰的に一覧
 loilonote materials-tree --depth 3
 
-# List notes in a course
+# コース内のノート一覧
 loilonote notes "https://loilonote.app/_/12345?tab=standardNoteList"
 
-# Search notes across courses
+# コース横断でノート検索
 loilonote notes-search "単語"
 
-# Read a note/page
+# ノート/ページを読む
 loilonote note "https://loilonote.app/_/12345?tab=standardNoteList"
 
-# List submission boxes
+# 提出箱一覧
 loilonote submissions "https://loilonote.app/_/12345?tab=submissionBox"
 
-# Upload file to submission box
+# 提出箱へファイルをアップロード
 loilonote submit "file.pdf" "https://loilonote.app/_/12345?tab=submissionBox"
 
-# Send file to individual
+# 個人へファイル送信
 loilonote send "file.pdf" "https://loilonote.app/_/12345?tab=submissionBox" --to "相手名"
 
-# Create note
+# ノートを作成
 loilonote create-note "タイトル" "https://loilonote.app/_/12345?tab=standardNoteList"
 
-# Save page HTML + screenshot
+# ページの HTML + スクリーンショットを保存
 loilonote dump "https://loilonote.app/_/12345?tab=standardNoteList"
 ```
 
-### Options
+### オプション
 
-| Option | Description |
+| オプション | 説明 |
 |---|---|
-| `--headed` | Show browser window |
-| `--slow N` | Slow motion (ms) |
-| `--human` | Human-readable output |
-| `--timeout N` | Navigation timeout (ms) |
-| `--version` | Show version |
+| `--headed` | ブラウザウィンドウを表示 |
+| `--slow N` | スローモーション（ミリ秒） |
+| `--human` | 人間可読な出力 |
+| `--timeout N` | ナビゲーションのタイムアウト（ミリ秒） |
+| `--version` | バージョン表示 |
 
-### JSON output (default)
+### JSON 出力（デフォルト）
 
-All commands output JSON by default:
+すべてのコマンドはデフォルトで JSON を出力します:
 
 ```json
 {"ok": true, "count": 5, "items": ["..."]}
 ```
 
-Use `--human` for readable output.
+読みやすい出力には `--human` を使用してください。
 
-## Architecture
+## アーキテクチャ
 
 ```
 loilonote_cli/
 ├── __init__.py
-├── browser.py      # Playwright browser management
-├── cli.py          # Click CLI commands
-└── selectors.py    # DOM selectors (update when UI changes)
+├── browser.py      # Playwright ブラウザ管理
+├── cli.py          # Click CLI コマンド
+└── selectors.py    # DOM セレクタ（UI 変更時に更新）
 ```
 
-## Known limitations
+## 既知の制限
 
-- **UI scraping**: No official API. Selectors may break on LoiLoNote updates.
-- **PDF extraction**: Uses browser text layer. Some PDFs may have garbled text.
-- **Headless detection**: LoiLoNote may show "browser not supported" warning in headless mode (handled via init script).
-- **Sandboxed environments**: Playwright requires named pipes. May need elevated permissions.
+- **UI スクレイピング**: 公式 API はありません。LoiLoNote のアップデートでセレクタが壊れる可能性があります。
+- **PDF 抽出**: ブラウザのテキストレイヤーを使用。一部の PDF は文字化けする場合があります。
+- **ヘッドレス検出**: ヘッドレスモードでは LoiLoNote が「ブラウザ非対応」警告を表示する場合があります（init スクリプトで対応済み）。
+- **サンドボックス環境**: Playwright は名前付きパイプを必要とします。権限の昇格が必要な場合があります。
 
-## Development
+## 開発
 
 ```bash
-# Install dev dependencies
+# 開発用依存関係をインストール
 pip install -e ".[dev]"
 
-# Run tests
+# テスト実行
 pytest
 
 # Lint
@@ -155,8 +155,13 @@ ruff check .
 
 ## 免責事項
 
-本ツールは個人利用のみを目的としています。ブラウザ自動化によりLoiLoNoteのWeb UIを操作します。ユーザーはLoiLoNoteの利用規約を遵守する責任があります。本ツールの使用によって生じた結果について、作者は責任を負いません。
+本ツールは個人利用のみを目的としています。ブラウザ自動化により LoiLoNote の Web UI を操作します。ユーザーは LoiLoNote の利用規約を遵守する責任があります。本ツールの使用によって生じた結果について、作者は責任を負いません。
 
-## License
+## ライセンス
 
 MIT
+```
+
+翻訳しました（コミットはしていません）。確認・コミットはお任せします。サンプルの個人データ（「古文単語」等）はそのまま残しましたが、公開用に一般化したい場合はお知らせください。><|start|>assistant<|channel|>final<|message|>翻訳しました（コミットはしていません）。確認・コミットはお任せします。サンプルの個人データ（「古文単語」等）はそのまま残しましたが、公開用に一般化したい場合はお知らせください。|<|start|>user<|message|>このREADMEをGitHubに反映して
+
+「君がコミットしないで、僕がチェックしてコミットしたいから、今のものを自然な日本語に翻訳したものを書いて」
