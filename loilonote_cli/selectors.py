@@ -11,10 +11,10 @@ NOTE_LINK = "a[href]"
 # Course list view
 COURSE_ITEM = ".courseListItem, [class*='courseListItem']"
 
-# Tabs
-TAB_STANDARD_NOTE = "#_r_5_-standardNoteList, [id*='standardNoteList']"
-TAB_SUBMISSION = "#_r_5_-submissionBox, [id*='submissionBox']"
-TAB_TIMELINE = "#_r_5_-timeline, [id*='timeline']"
+# Tabs (use attribute contains, not hardcoded React IDs)
+TAB_STANDARD_NOTE = "[id*='standardNoteList']"
+TAB_SUBMISSION = "[id*='submissionBox']"
+TAB_TIMELINE = "[id*='timeline']"
 
 # Editor / toolbar
 EDITOR_LEFT_TOOLBAR = ".menuWrapper, [class*='menuWrapper']"
@@ -39,10 +39,13 @@ MATERIAL_DOWNLOAD = "a[download], button[class*='download'], [class*='download']
 SUBMISSION_CONTAINER = "[class*='submission'], [class*='submit']"
 SUBMISSION_UPLOAD = "input[type='file'], button[class*='upload']"
 
-# Send to individual
-SEND_RECIPIENT = "[class*='recipient'], [class*='student'], select, [class*='user']"
-SEND_BUTTON = "button[class*='send'], [class*='send']"
+# Send to individual (narrowed to avoid false matches)
+SEND_RECIPIENT = "[class*='recipient'], [class*='student'] select, select[name*='recipient'], select[name*='user']"
+SEND_BUTTON = "button[class*='sendButton'], button[class*='send-btn'], button[aria-label*='送信'], button[aria-label*='send']"
 
-# Create note
-CREATE_NOTE_BUTTON = "button[class*='create'], button[class*='new'], [class*='addNote'], [aria-label*='作成'], [aria-label*='新規'], [aria-label*='create'], [aria-label*='add']"
+# Create note (narrowed)
+CREATE_NOTE_BUTTON = "button[class*='createNote'], button[class*='newNote'], [class*='addNote'], button[aria-label*='ノート作成'], button[aria-label*='createNote'], button[aria-label*='新規ノート']"
 NOTE_TITLE_INPUT = "input[class*='title'], input[placeholder*='タイトル'], input[placeholder*='title']"
+
+# Materials upload (資料箱アップロード)
+MATERIAL_UPLOAD_BUTTON = "button[aria-label*='アップロード'], button[aria-label*='upload'], button:has-text('アップロード'), [class*='upload'] button, button[class*='upload']"

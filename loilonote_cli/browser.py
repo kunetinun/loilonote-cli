@@ -22,16 +22,24 @@ REAL_UA = (
 
 INIT_SCRIPT = """
 (() => {
+  let debounceTimer = null;
   const clean = () => {
     document.querySelectorAll('#continue, .tutorialContainer, .tutorialDialog').forEach(e => e.remove());
     document.querySelectorAll('[inert]').forEach(e => e.removeAttribute('inert'));
+  };
+  const debouncedClean = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(clean, 150);
   };
   clean();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', clean, { once: true });
   }
-  const obs = new MutationObserver(clean);
-  if (document.body) obs.observe(document.body, { childList: true, subtree: true });
+  // Observe subtree but with debounced clean to reduce overhead
+  if (document.body) {
+    const obs = new MutationObserver(debouncedClean);
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
 })();
 """
 
@@ -64,12 +72,17 @@ def make_browser(headless: bool = True, slow_mo: int = 0):
     browser = pw.chromium.launch(
         headless=headless,
         slow_mo=slow_mo,
-        args=["--disable-blink-features=AutomationControlled"],
+        args=[
+            "--disable-blink-features=AutomationControlled",
+            "--disable-gpu",
+            "--disable-dev-shm-usage",
+            "--no-sandbox",
+        ],
     )
     return pw, browser
 
 
-def make_context(browser, headless: bool = True):
+def make_context(browser, headless: bool = True, block_resources: bool = True):
     state = load_state()
     kwargs = {
         "viewport": {"width": 1400, "height": 900},
@@ -80,12 +93,19 @@ def make_context(browser, headless: bool = True):
         kwargs["storage_state"] = state
     ctx = browser.new_context(**kwargs)
     ctx.add_init_script(INIT_SCRIPT)
+    if block_resources:
+        def _route_handler(route):
+            if route.request.resource_type in {"image", "media"}:
+                route.abort()
+            else:
+                route.continue_()
+        ctx.route("**/*", _route_handler)
     return ctx
 
 
-def new_page(headless: bool = True, slow_mo: int = 0) -> Tuple:
+def new_page(headless: bool = True, slow_mo: int = 0, block_resources: bool = True) -> Tuple:
     pw, browser = make_browser(headless=headless, slow_mo=slow_mo)
-    ctx = make_context(browser, headless=headless)
+    ctx = make_context(browser, headless=headless, block_resources=block_resources)
     page = ctx.new_page()
     return pw, browser, ctx, page
 
