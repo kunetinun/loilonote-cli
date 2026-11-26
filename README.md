@@ -93,6 +93,12 @@ loilonote submissions "https://loilonote.app/_/12345?tab=submissionBox"
 # 提出箱へファイルをアップロード
 loilonote submit "file.pdf" "https://loilonote.app/_/12345?tab=submissionBox"
 
+# 資料箱へファイルをアップロード
+loilonote materials-upload "file.pdf" --path "マイフォルダ/同期用"
+
+# 直接フォルダURL指定（高速）
+loilonote materials-upload "file.pdf" --folder-url "https://loilonote.app/_/material-box/287069612"
+
 # 個人へファイル送信
 loilonote send "file.pdf" "https://loilonote.app/_/12345?tab=submissionBox" --to "相手名"
 
@@ -112,6 +118,7 @@ loilonote dump "https://loilonote.app/_/12345?tab=standardNoteList"
 | `--human` | 人間可読な出力 |
 | `--timeout N` | ナビゲーションのタイムアウト（ミリ秒） |
 | `--version` | バージョン表示 |
+| `--dump` | コマンド実行後にページの HTML + スクリーンショットを保存（デフォルト: 無効） |
 
 ### JSON 出力（デフォルト）
 
