@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -42,3 +42,8 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Auto-upload
+.upload_state.json
+.auth_token.json
+upload.log
