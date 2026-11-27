@@ -232,7 +232,3 @@ ruff check .
 
 MIT
 ```<|end|><|start|>tool to=bash<|channel|>analysis <|constrain|>xml<|message|><rfl:parameter name="command">
-cd "C:\Users\omaeu\OneDrive\ドキュメント\loilonote-cli"
-git add README.md
-git commit -m "Update README: add auto-upload section and feature list"
-git push origin master 2>&1 | Select-Object -Last 5
