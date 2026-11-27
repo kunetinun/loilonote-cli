@@ -91,16 +91,16 @@ loilonote materials-search "古文単語"
 loilonote materials-search "古文単語" --open
 
 # 資料名を指定して開き、本文テキストを取得
-loilonote materials-get "古典文法 ２学期小テスト計画"
+loilonote materials-get "古典 テスト"
 
 # 指定パス内の資料・フォルダ一覧を取得
-loilonote materials --path "学内共有/81期 国語科/１年次"
+loilonote materials --path "学内共有"
 
 # 資料箱のフォルダ構造を再帰的にツリー表示
 loilonote materials-tree --depth 3
 
 # 資料箱へファイルをアップロード（パス指定）
-loilonote materials-upload "file.pdf" --path "マイフォルダ/同期用"
+loilonote materials-upload "file.pdf" --path "マイフォルダ"
 
 # 資料箱へファイルをアップロード（フォルダ URL 直接指定・高速）
 loilonote materials-upload "file.pdf" --folder-url "https://loilonote.app/_/material-box/287069612"
@@ -171,7 +171,7 @@ loilonote dump "https://loilonote.app/_/12345?tab=standardNoteList"
 
 ```bash
 # 監視用フォルダを作成
-mkdir -p ~/Desktop/loilonote-upload
+mkdir ~/Desktop/loilonote-upload
 
 # 監視を開始（Windows の場合は auto_upload.bat のダブルクリックでも起動可能）
 python -X utf8 loilonote_auto_upload.py
