@@ -14,6 +14,7 @@
 - **メッセージング** — 個人へのファイル送信
 - **AI ファースト** — デフォルトは JSON 出力、`--human` で読みやすい出力
 - **キャッシュ** — コース URL をキャッシュして高速再利用
+- **自動アップロード** — フォルダ監視による自動ファイルアップロード（`loilonote_auto_upload.py`）
 
 ## インストール
 
@@ -130,6 +131,63 @@ loilonote dump "https://loilonote.app/_/12345?tab=standardNoteList"
 
 読みやすい出力には `--human` を使用してください。
 
+## 自動アップロード（Auto-Upload Watcher）
+
+フォルダを監視し、ファイルが追加されるたびに自動でロイロノート資料箱にアップロードする監視スクリプトです。
+
+### セットアップ
+
+```bash
+# 監視フォルダを作成
+mkdir ~/Desktop/loilonote-upload
+
+# 監視を開始（Windows: auto_upload.bat をダブルクリック）
+python -X utf8 loilonote_auto_upload.py
+
+# 1回だけチェックして終了
+python -X utf8 loilonote_auto_upload.py --once
+```
+
+### 動作
+
+1. 監視フォルダ（デフォルト: `~/Desktop/loilonote-upload`）にファイルが追加される
+2. ファイルの書き込みが完了するまで待機（安定性チェック）
+3. 3ステップAPIで資料箱にアップロード
+4. 成功 → `uploaded/` フォルダに移動
+5. 失敗 → `failed/` フォルダに移動
+
+### オプション
+
+| オプション | 説明 |
+|---|---|
+| `--watch-dir PATH` | 監視フォルダを指定（デフォルト: `~/Desktop/loilonote-upload`） |
+| `--folder-id ID` | アップロード先フォルダID（デフォルト: `287069612`） |
+| `--folder-url URL` | アップロード先フォルダURL（auth_token取得用） |
+| `--material-path PATH` | 表示用パス名（デフォルト: `マイフォルダ/同期用`） |
+| `--loilonote-dir DIR` | loilonote-cli のディレクトリ |
+| `--once` | 1回だけチェックして終了 |
+| `--interval N` | 監視間隔（秒、デフォルト: 2） |
+| `--dump` | デバッグ: API応答を詳細ログに出力 |
+
+### 除外ファイル
+
+以下のファイルは自動的にアップロード対象外です:
+
+- ドットファイル（`.hidden` など）
+- 一時ファイル（`.tmp`, `.part`, `.crdownload` など）
+- スクリプトファイル（`.bat`, `.cmd`, `.ps1`, `.py` など）
+- `desktop.ini`, `Thumbs.db`
+- `uploaded/` / `failed/` サブフォルダ内のファイル
+
+### 注意事項
+
+- 初回実行時にPlaywrightでauth_tokenを取得します（ブラウザが一瞬開きます）
+- auth_tokenは `.auth_token.json` にキャッシュされます
+- loilonote-cli の `state.json`（Playwrightセッション）が必要です
+- 画像ファイル（`.png`, `.jpg` など）は自動でサイズ情報を取得し、正しいメタデータでアップロードされます
+
+---
+
 ## アーキテクチャ
 
 ```
@@ -146,6 +204,7 @@ loilonote_cli/
 - **PDF 抽出**: ブラウザのテキストレイヤーを使用。一部の PDF は文字化けする場合があります。
 - **ヘッドレス検出**: ヘッドレスモードでは LoiLoNote が「ブラウザ非対応」警告を表示する場合があります（init スクリプトで対応済み）。
 - **サンドボックス環境**: Playwright は名前付きパイプを必要とします。権限の昇格が必要な場合があります。
+- **自動アップロード**: 3ステップAPIを使用。LoiLoNoteの内部APIに依存するため、UI変更で動作しなくなる可能性があります
 
 ## 開発
 
@@ -172,4 +231,8 @@ ruff check .
 ## ライセンス
 
 MIT
-```
+```<|end|><|start|>tool to=bash<|channel|>analysis <|constrain|>xml<|message|><rfl:parameter name="command">
+cd "C:\Users\omaeu\OneDrive\ドキュメント\loilonote-cli"
+git add README.md
+git commit -m "Update README: add auto-upload section and feature list"
+git push origin master 2>&1 | Select-Object -Last 5
