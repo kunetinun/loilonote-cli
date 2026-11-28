@@ -26,7 +26,9 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 import urllib.parse
@@ -43,6 +45,19 @@ DEFAULT_MAX_RETRIES = 3
 
 EXCLUDE_SUFFIXES = {".tmp", ".part", ".crdownload", ".download", ".bat", ".cmd", ".ps1", ".lnk", ".py"}
 EXCLUDE_NAMES = {"desktop.ini", "Thumbs.db", ".DS_Store", ".localized"}
+
+# LoiLoNote can render these as cards directly.
+SUPPORTED_CARD_SUFFIXES = {
+    ".pdf", ".jpg", ".jpeg", ".png", ".gif",
+    ".mov", ".mp4", ".webm", ".mp3", ".m4a", ".aac", ".wav",
+}
+
+# Extensions that should be converted to PDF before upload (so they become cards).
+CONVERT_TO_PDF_SUFFIXES = {
+    ".pptx", ".ppt", ".docx", ".doc", ".xlsx", ".xls",
+    ".odp", ".odt", ".ods", ".rtf", ".md", ".markdown",
+    ".txt", ".html", ".htm",
+}
 
 
 def log(msg: str, log_file: Path | None = None) -> None:
@@ -107,11 +122,15 @@ def get_auth_token_playwright(folder_url: str, loilonote_cwd: Path, auth_token_f
 
         page.on("request", on_request)
         page.goto(folder_url, wait_until="domcontentloaded", timeout=30000)
-        try:
-            page.wait_for_load_state("networkidle", timeout=8000)
-        except Exception:
-            pass
-        time.sleep(1)
+        # Wait for the API request that carries auth_token
+        for _ in range(20):
+            if auth_token[0]:
+                break
+            try:
+                page.wait_for_load_state("networkidle", timeout=1000)
+            except Exception:
+                pass
+            time.sleep(0.5)
 
         token = auth_token[0]
         browser.close_all(pw, br, ctxb, page)
@@ -301,6 +320,66 @@ def move_to_dir(src: Path, dst_dir: Path) -> Path:
     return dst
 
 
+def find_soffice() -> Path | None:
+    """Locate LibreOffice's soffice executable across platforms."""
+    # 1. PATH
+    for name in ("soffice", "soffice.exe", "libreoffice", "libreoffice.exe"):
+        found = shutil.which(name)
+        if found:
+            return Path(found)
+    # 2. Common install locations
+    candidates = []
+    import platform as _platform
+    system = _platform.system()
+    if system == "Windows":
+        candidates += [
+            Path("C:/Program Files/LibreOffice/program/soffice.exe"),
+            Path("C:/Program Files (x86)/LibreOffice/program/soffice.exe"),
+        ]
+    elif system == "Darwin":
+        candidates += [
+            Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"),
+        ]
+    else:
+        candidates += [
+            Path("/usr/bin/soffice"),
+            Path("/usr/lib/libreoffice/program/soffice"),
+            Path("/opt/libreoffice/program/soffice"),
+        ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return None
+
+
+def convert_to_pdf(src: Path, log_file: Path | None = None) -> Path | None:
+    """Convert a file to PDF using LibreOffice headless. Returns PDF path or None."""
+    soffice = find_soffice()
+    if soffice is None:
+        log("LibreOffice (soffice) が見つかりません。変換をスキップします。", log_file)
+        return None
+    workdir = Path(tempfile.mkdtemp(prefix="loilonote_convert_"))
+    try:
+        subprocess.run(
+            [str(soffice), "--headless", "--convert-to", "pdf", "--outdir", str(workdir), str(src)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=180,
+            check=False,
+        )
+        out = workdir / (src.stem + ".pdf")
+        if out.exists() and out.stat().st_size > 0:
+            return out
+        # Sometimes LibreOffice names differently; search
+        pdfs = list(workdir.glob("*.pdf"))
+        if pdfs:
+            return pdfs[0]
+        return None
+    except Exception as e:
+        log(f"変換失敗: {src.name}: {e}", log_file)
+        return None
+
+
 def scan_and_upload(
     watch_dir: Path,
     uploaded_dir: Path,
@@ -359,8 +438,35 @@ def scan_and_upload(
             continue
         key = file_key(p)
 
+        # Convert non-card formats (pptx, md, ...) to PDF so they can be used as cards
+        upload_path = p
+        converted_pdf: Path | None = None
+        suffix = p.suffix.lower()
+        if suffix not in SUPPORTED_CARD_SUFFIXES:
+            if suffix in CONVERT_TO_PDF_SUFFIXES:
+                log(f"変換中 (PDF化): {p.name}", log_file)
+                converted_pdf = convert_to_pdf(p, log_file)
+                if converted_pdf is None:
+                    log(f"変換失敗、アップロード中止: {p.name}", log_file)
+                    try:
+                        moved = move_to_dir(p, failed_dir)
+                        log(f"失敗ファイルを退避: {moved}", log_file)
+                    except Exception as e:
+                        log(f"失敗ファイル退避にも失敗: {p.name}: {e}", log_file)
+                    continue
+                upload_path = converted_pdf
+                log(f"変換完了: {converted_pdf.name}", log_file)
+            else:
+                log(f"未対応形式のためスキップ: {p.name}", log_file)
+                try:
+                    moved = move_to_dir(p, failed_dir)
+                    log(f"失敗ファイルを退避: {moved}", log_file)
+                except Exception as e:
+                    log(f"失敗ファイル退避にも失敗: {p.name}: {e}", log_file)
+                continue
+
         t0 = time.time()
-        ok, detail = upload_file_api(p, auth_token, folder_id, cookies, debug=debug, log_file=log_file)
+        ok, detail = upload_file_api(upload_path, auth_token, folder_id, cookies, debug=debug, log_file=log_file)
         elapsed = time.time() - t0
 
         # If auth expired, try to refresh token once
@@ -372,7 +478,7 @@ def scan_and_upload(
                     cookies = get_cookies(loilonote_dir)
                 except Exception:
                     pass
-                ok, detail = upload_file_api(p, auth_token, folder_id, cookies, debug=debug, log_file=log_file)
+                ok, detail = upload_file_api(upload_path, auth_token, folder_id, cookies, debug=debug, log_file=log_file)
                 elapsed = time.time() - t0
 
         if ok:
@@ -382,6 +488,12 @@ def scan_and_upload(
                 "target": material_path,
             }
             save_state(state, state_file)
+            if converted_pdf is not None:
+                try:
+                    converted_pdf.unlink(missing_ok=True)
+                    converted_pdf.parent.rmdir()
+                except Exception:
+                    pass
             try:
                 moved = move_to_dir(p, uploaded_dir)
                 log(f"成功: {p.name} -> {moved} ({elapsed:.1f}s)", log_file)
@@ -389,6 +501,12 @@ def scan_and_upload(
                 log(f"アップロード成功だが移動失敗: {p.name}: {e}", log_file)
             uploaded_count += 1
         else:
+            if converted_pdf is not None:
+                try:
+                    converted_pdf.unlink(missing_ok=True)
+                    converted_pdf.parent.rmdir()
+                except Exception:
+                    pass
             log(f"失敗: {p.name}: {detail} ({elapsed:.1f}s)", log_file)
             try:
                 moved = move_to_dir(p, failed_dir)

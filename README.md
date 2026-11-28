@@ -237,6 +237,7 @@ python -X utf8 loilonote_auto_upload.py --once
 - 初回実行時に Playwright 経由で auth_token を取得するため、ブラウザが一瞬起動します。取得したトークンは `.auth_token.json` にキャッシュされ、次回以降は再利用されます。
 - 事前に `loilonote login` を実行し、`~/.loilonote/state.json` が作成されている必要があります。
 - 画像ファイル（`.png`, `.jpg` など）は縦横サイズを自動取得し、適切なメタデータ付きでアップロードされます。
+- ノートにカードとして追加できない形式（`.pptx`, `.docx`, `.md`, `.txt` など）は、LibreOffice がインストールされている場合に自動で PDF に変換してからアップロードされます（LibreOffice 未導入の場合はスキップされ `failed/` に退避されます）。
 
 ---
 
