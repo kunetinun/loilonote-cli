@@ -42,7 +42,7 @@ DEFAULT_STABLE_CHECKS = 2
 DEFAULT_MAX_RETRIES = 3
 
 EXCLUDE_SUFFIXES = {".tmp", ".part", ".crdownload", ".download", ".bat", ".cmd", ".ps1", ".lnk", ".py"}
-EXCLUDE_NAMES = {"desktop.ini", "Thumbs.db"}
+EXCLUDE_NAMES = {"desktop.ini", "Thumbs.db", ".DS_Store", ".localized"}
 
 
 def log(msg: str, log_file: Path | None = None) -> None:
@@ -424,6 +424,8 @@ def main() -> int:
         # Try to find loilonote-cli (script's own dir first, since it lives there)
         candidates = [
             Path(__file__).resolve().parent,
+            Path.home() / "Documents" / "loilonote-cli",
+            Path.home() / "OneDrive" / "Documents" / "loilonote-cli",
             Path.home() / "OneDrive" / "ドキュメント" / "loilonote-cli",
             Path.cwd().parent / "loilonote-cli",
             Path.cwd() / "loilonote-cli",

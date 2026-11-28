@@ -305,10 +305,19 @@ def doctor(ctx):
         res["playwright"] = getattr(playwright, "__version__", "installed")
     except Exception as e:
         res["playwright"] = f"MISSING: {e}"; res["ok"] = False
-    chromium_dir = Path(os.path.expanduser("~")) / "AppData" / "Local" / "ms-playwright"
+    # Check for Chromium installation across platforms
+    import platform as _platform
+    home = Path(os.path.expanduser("~"))
+    if _platform.system() == "Windows":
+        chromium_dir = home / "AppData" / "Local" / "ms-playwright"
+    elif _platform.system() == "Darwin":
+        chromium_dir = home / "Library" / "Caches" / "ms-playwright"
+    else:
+        chromium_dir = home / ".cache" / "ms-playwright"
     res["chromium_installed"] = chromium_dir.exists()
     if not chromium_dir.exists():
         res["ok"] = False
+    res["chromium_path"] = str(chromium_dir)
     res["session_exists"] = browser.has_state()
     emit(ctx, res)
     sys.exit(0 if res["ok"] else 1)

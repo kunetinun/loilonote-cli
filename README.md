@@ -19,9 +19,16 @@ LoiLoNote School（ロイロノート・スクール）の Web UI および内�
 
 ## 前提条件・動作環境
 
-- **OS:** Windows（主な動作確認環境。macOS / Linux でも動作しますが、`doctor` コマンドのパス判定など一部 Windows 向けの記述を含みます）
+- **OS:** Windows / macOS / Linux（クロスプラットフォーム対応）
 - **Python:** 3.9 以上
 - **ブラウザ:** Playwright + Chromium
+
+### OS 別の起動方法
+
+| OS | CLI 起動 | 自動アップロード起動 |
+|---|---|---|
+| Windows | `loilonote.bat` または `python loilonote.py` | `auto_upload.bat` のダブルクリック |
+| macOS / Linux | `./loilonote.sh` または `python3 loilonote.py` | `./auto_upload.sh` |
 
 ---
 
@@ -39,9 +46,14 @@ pip install -e .
 playwright install chromium
 ```
 
-### Windows での注意点
+### OS 別の注意点
 
-Playwright は内部で名前付きパイプを使用するため、AI エージェント等の制限付きサンドボックス環境からは起動がブロックされる場合があります。エラーになる場合は、通常のターミナルや適切な権限下で実行してください。
+**Windows:** Playwright は内部で名前付きパイプを使用するため、AI エージェント等の制限付きサンドボックス環境からは起動がブロックされる場合があります。エラーになる場合は、通常のターミナルや適切な権限下で実行してください。
+
+**macOS / Linux:** `loilonote.sh` と `auto_upload.sh` に実行権限を付与してください:
+```bash
+chmod +x loilonote.sh auto_upload.sh
+```
 
 ---
 
@@ -183,7 +195,7 @@ loilonote dump "https://loilonote.app/_/12345?tab=standardNoteList"
 # 監視用フォルダを作成
 mkdir ~/Desktop/loilonote-upload
 
-# 監視を開始（Windows の場合は auto_upload.bat のダブルクリックでも起動可能）
+# 監視を開始（Windows: auto_upload.bat / macOS・Linux: ./auto_upload.sh）
 python -X utf8 loilonote_auto_upload.py
 
 # 1回だけフォルダを確認して終了する場合
