@@ -1,4 +1,4 @@
-# LoiLoNote CLI
+﻿# LoiLoNote CLI
 
 LoiLoNote School（ロイロノート・スクール）の Web UI および内部 API を Playwright で自動操作するコマンドラインツールです。
 人間によるターミナル操作と、AI エージェントからのプログラム呼び出しの双方を想定しており、デフォルトで機械可読な JSON を出力します。
@@ -9,7 +9,7 @@ LoiLoNote School（ロイロノート・スクール）の Web UI および内�
 
 - **セッション管理** — 一度手動でログインすればセッション（`state.json`）を保存・再利用可能
 - **コース一覧・キャッシュ** — 所属コースと URL を一覧取得し、ローカルにキャッシュして高速再利用
-- **ノート管理** — コース内のノート一覧取得、横断検索、本文テキストの抽出
+- **ノート管理** — コース内のノート一覧取得、横断検索、本文テキストの抽出、内部構造解析、ZIP ダウンロード
 - **資料検索・閲覧** — 資料箱のキーワード検索、テキスト抽出、フォルダ指定・ツリー構造の取得
 - **提出・送信** — 提出箱一覧の取得、提出箱へのファイルアップロード、個人宛てファイル送信
 - **資料箱アップロード** — コマンドによる単発アップロード、およびフォルダ監視による自動アップロード（`loilonote_auto_upload.py`）
@@ -91,16 +91,16 @@ loilonote materials-search "古文単語"
 loilonote materials-search "古文単語" --open
 
 # 資料名を指定して開き、本文テキストを取得
-loilonote materials-get "古典 テスト"
+loilonote materials-get "古典文法 ２学期小テスト計画"
 
 # 指定パス内の資料・フォルダ一覧を取得
-loilonote materials --path "学内共有"
+loilonote materials --path "学内共有/81期 国語科/１年次"
 
 # 資料箱のフォルダ構造を再帰的にツリー表示
 loilonote materials-tree --depth 3
 
 # 資料箱へファイルをアップロード（パス指定）
-loilonote materials-upload "file.pdf" --path "マイフォルダ"
+loilonote materials-upload "file.pdf" --path "マイフォルダ/同期用"
 
 # 資料箱へファイルをアップロード（フォルダ URL 直接指定・高速）
 loilonote materials-upload "file.pdf" --folder-url "https://loilonote.app/_/material-box/287069612"
@@ -117,6 +117,16 @@ loilonote notes-search "単語"
 
 # ノート・ページのテキストを取得
 loilonote note "https://loilonote.app/_/12345?tab=standardNoteList"
+
+# ノート ID を指定してテキストを抽出（ZIP 内部を解析）
+loilonote note-text 1458859786
+
+# ノート ID を指定して内部構造を解析（カード・ガジェット・フレーム）
+loilonote note-inspect 1458859786
+
+# ノートを ZIP ファイルとしてダウンロード
+loilonote note-download 1458859786
+loilonote note-download 1458859786 -o ./my_note.zip
 
 # 提出箱の一覧を取得
 loilonote submissions "https://loilonote.app/_/12345?tab=submissionBox"
@@ -281,24 +291,11 @@ ruff check .
 
 ---
 
-## 免責事項
+## クレジット・謝辞
 
-本ツールは非公式の個人開発プロジェクトであり、株式会社 LoiLo とは一切関係ありません。
-ロイロノート・スクールの利用規約（第 10.3 条「提供コンテンツの利用」、第 10.7 条「提供コンテンツの利用範囲」、第 12.1 条「妨害行為」等）に抵触する可能性があります。利用はすべて自己責任で行ってください。
-
-本ツールは自動操作および内部 API へのアクセスを行います。短時間の連続実行や過度なアクセスはサーバーへ負荷をかけ、アカウント制限・利用停止（BAN）につながるリスクがあります。
-
-学校や教育委員会が管理するアカウントでは、非公式ツールや自動化ツールの利用が規定で禁止されている場合があります。事前に所属機関のルールを確認してください。
-
-本ツールの使用によって生じたいかなる損害・不利益についても、作者は一切の責任を負いません。
-
----
+- ノート内部構造の解析・ダウンロード機能は [samcct-bit/loilonote-cli](https://github.com/samcct-bit/loilonote-cli)（MIT License）を参考に実装しました。
+  ノート ZIP のダウンロード API および内部構造の解析ロジックは、同プロジェクトの実装を参考にしています。
 
 ## ライセンス
 
 MIT License
-```<|end|><|start|>tool to=bash<|channel|>analysis <|constrain|>xml<|message|><rfl:parameter name="command">
-cd "C:\Users\omaeu\OneDrive\ドキュメント\loilonote-cli"
-git add README.md
-git commit -m "Rewrite README with improved structure and formatting"
-git push origin master --force 2>&1 | Select-Object -Last 5

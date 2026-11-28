@@ -1,9 +1,14 @@
+import io
 import json
 import os
 import re
 import signal
 import sys
 import time
+import urllib.parse
+import urllib.request
+import zipfile
+from datetime import datetime
 from pathlib import Path
 
 try:
@@ -20,7 +25,7 @@ from . import browser, selectors
 from .browser import retry
 
 logger = logging.getLogger("loilonote.cli")
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
@@ -94,6 +99,153 @@ def load_courses():
 def save_courses(courses):
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     COURSES_CACHE.write_text(json.dumps(courses, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+# ---------- auth token helpers ----------
+AUTH_TOKEN_FILE = CACHE_DIR / "auth_token.json"
+
+
+def load_auth_token():
+    if AUTH_TOKEN_FILE.exists():
+        try:
+            data = json.loads(AUTH_TOKEN_FILE.read_text(encoding="utf-8"))
+            return data.get("auth_token")
+        except Exception:
+            return None
+    return None
+
+
+def save_auth_token(token):
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    AUTH_TOKEN_FILE.write_text(json.dumps({"auth_token": token}, ensure_ascii=False), encoding="utf-8")
+
+
+def get_auth_token(ctx):
+    """Get auth_token, using cache or intercepting from browser."""
+    token = load_auth_token()
+    if token:
+        return token
+    if not browser.has_state():
+        return None
+    pw, br, ctxb, page = browser.new_page(headless=True, slow_mo=0, block_resources=False)
+    captured = [None]
+
+    def on_request(request):
+        url = request.url
+        if "auth_token=" in url and captured[0] is None:
+            parsed = urllib.parse.urlparse(url)
+            qs = urllib.parse.parse_qs(parsed.query)
+            if "auth_token" in qs:
+                captured[0] = qs["auth_token"][0]
+
+    page.on("request", on_request)
+    goto(page, browser.BASE_URL, wait=5000, timeout=ctx.obj["timeout"])
+    try:
+        page.wait_for_load_state("networkidle", timeout=8000)
+    except PWTimeout:
+        pass
+    time.sleep(1)
+    browser.close_all(pw, br, ctxb, page)
+    if captured[0]:
+        save_auth_token(captured[0])
+    return captured[0]
+
+
+# Adapted from samcct-bit/loilonote-cli (MIT License)
+# https://github.com/samcct-bit/loilonote-cli
+# Original: packages/core/src/client.ts (getNote)
+def fetch_note_zip(note_id, token):
+    """Download note ZIP from API. Returns bytes."""
+    url = f"https://n.loilo.tv/api/notes/{note_id}?auth_token={urllib.parse.quote(token)}"
+    req = urllib.request.Request(url)
+    resp = urllib.request.urlopen(req, timeout=60)
+    return resp.read()
+
+
+# Adapted from samcct-bit/loilonote-cli (MIT License)
+# https://github.com/samcct-bit/loilonote-cli
+# Original: packages/core/src/client.ts (getParsedNote, extractText, extractAssets)
+def parse_note_zip(data):
+    """Parse note ZIP bytes into structured dict."""
+    zf = zipfile.ZipFile(io.BytesIO(data))
+    namelist = zf.namelist()
+
+    version = None
+    header = None
+    body = None
+
+    if "version" in namelist:
+        try:
+            version = zf.read("version").decode("utf-8").strip()
+        except Exception:
+            pass
+    if "header" in namelist:
+        try:
+            header = json.loads(zf.read("header").decode("utf-8"))
+        except Exception:
+            pass
+    if "body" in namelist:
+        try:
+            body = json.loads(zf.read("body").decode("utf-8"))
+        except Exception:
+            pass
+
+    frames = []
+    if body and isinstance(body, dict):
+        frames = body.get("data", {}).get("frames", [])
+
+    frame_types = list(dict.fromkeys(f.get("type") for f in frames if f.get("type")))
+
+    # Extract text
+    texts = []
+    for frame in frames:
+        gadgets = frame.get("gadgets", {})
+        if not isinstance(gadgets, dict):
+            continue
+        for key in gadgets:
+            gadget = gadgets[key]
+            if not isinstance(gadget, dict):
+                continue
+            if gadget.get("text") and isinstance(gadget["text"], str):
+                texts.append(gadget["text"])
+            if gadget.get("html") and isinstance(gadget["html"], str):
+                texts.append(re.sub(r"<[^>]+>", "", gadget["html"]))
+
+    # Extract assets (remote_id references)
+    assets = []
+    for frame in frames:
+        gadgets = frame.get("gadgets", {})
+        if not isinstance(gadgets, dict):
+            continue
+        drawn = gadgets.get("drawn")
+        if isinstance(drawn, dict):
+            asset = drawn.get("asset", {})
+            if isinstance(asset, dict) and asset.get("remote_id"):
+                assets.append({
+                    "frame_id": frame.get("id"),
+                    "frame_type": frame.get("type"),
+                    "remote_id": asset["remote_id"],
+                })
+        bgm = gadgets.get("bgm")
+        if isinstance(bgm, dict):
+            img = bgm.get("image", {})
+            if isinstance(img, dict) and img.get("remote_id"):
+                assets.append({
+                    "frame_id": frame.get("id"),
+                    "frame_type": f"{frame.get('type')}-bg",
+                    "remote_id": img["remote_id"],
+                })
+
+    return {
+        "version": version,
+        "header": header,
+        "body": body,
+        "zip_files": namelist,
+        "frame_count": len(frames),
+        "frame_types": frame_types,
+        "texts": texts,
+        "assets": assets,
+    }
 
 
 @click.group()
@@ -281,6 +433,97 @@ def note(ctx, url):
     emit(ctx, {"ok": True, "url": page.url, "text": text[:8000], "length": len(text),
                "dump_html": html_path, "dump_png": png_path})
     close(ctx.obj, pw, br, ctxb, page)
+
+
+# ---------- note-text (extract text from note by ID) ----------
+@cli.command("note-text")
+@click.argument("note_id")
+@click.pass_context
+def note_text(ctx, note_id):
+    """Extract all text content from a note by its ID (downloads and parses the note ZIP)."""
+    if not browser.has_state():
+        fail(ctx, "no session; run login first", 2)
+    token = get_auth_token(ctx)
+    if not token:
+        fail(ctx, "could not obtain auth_token; try running `loilonote login` first", 2)
+    try:
+        data = fetch_note_zip(note_id, token)
+    except Exception as e:
+        fail(ctx, f"failed to download note {note_id}: {e}")
+    parsed = parse_note_zip(data)
+    text = "\n---\n".join(parsed["texts"])
+    emit(ctx, {
+        "ok": True,
+        "note_id": note_id,
+        "text": text,
+        "length": len(text),
+        "text_count": len(parsed["texts"]),
+        "frame_count": parsed["frame_count"],
+    })
+
+
+# ---------- note-inspect (parse note structure) ----------
+@cli.command("note-inspect")
+@click.argument("note_id")
+@click.pass_context
+def note_inspect(ctx, note_id):
+    """Download and parse a note, showing its internal structure (cards, gadgets, frames)."""
+    if not browser.has_state():
+        fail(ctx, "no session; run login first", 2)
+    token = get_auth_token(ctx)
+    if not token:
+        fail(ctx, "could not obtain auth_token; try running `loilonote login` first", 2)
+    try:
+        data = fetch_note_zip(note_id, token)
+    except Exception as e:
+        fail(ctx, f"failed to download note {note_id}: {e}")
+    parsed = parse_note_zip(data)
+    emit(ctx, {
+        "ok": True,
+        "note_id": note_id,
+        "version": parsed["version"],
+        "header": parsed["header"],
+        "frame_count": parsed["frame_count"],
+        "frame_types": parsed["frame_types"],
+        "text_count": len(parsed["texts"]),
+        "texts": parsed["texts"][:20],
+        "asset_count": len(parsed["assets"]),
+        "assets": parsed["assets"],
+        "zip_files": parsed["zip_files"],
+    })
+
+
+# ---------- note-download (download note ZIP) ----------
+@cli.command("note-download")
+@click.argument("note_id")
+@click.option("--output", "-o", default="", help="Output file path (default: ~/.loilonote/backups/note_{id}_{timestamp}.zip)")
+@click.pass_context
+def note_download(ctx, note_id, output):
+    """Download a note as a ZIP file."""
+    if not browser.has_state():
+        fail(ctx, "no session; run login first", 2)
+    token = get_auth_token(ctx)
+    if not token:
+        fail(ctx, "could not obtain auth_token; try running `loilonote login` first", 2)
+    try:
+        data = fetch_note_zip(note_id, token)
+    except Exception as e:
+        fail(ctx, f"failed to download note {note_id}: {e}")
+    if output:
+        out_path = Path(output)
+    else:
+        backup_dir = CACHE_DIR / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = backup_dir / f"note_{note_id}_{ts}.zip"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(data)
+    emit(ctx, {
+        "ok": True,
+        "note_id": note_id,
+        "path": str(out_path),
+        "size": len(data),
+    })
 
 
 @cli.command("notes-search")
